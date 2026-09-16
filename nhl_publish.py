@@ -1,20 +1,24 @@
 from __future__ import annotations
 
-import json
 import os
 from datetime import date
 from typing import Any
 
 import gspread
+import google.auth
 from google.oauth2.service_account import Credentials
 
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
 
 def _client() -> gspread.Client:
-    raw = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
-    credentials = Credentials.from_service_account_info(json.loads(raw), scopes=SCOPES)
+    raw = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
+    if raw:
+        import json
+        credentials = Credentials.from_service_account_info(json.loads(raw), scopes=SCOPES)
+    else:
+        credentials, _ = google.auth.default(scopes=SCOPES)
     return gspread.authorize(credentials)
 
 
@@ -67,4 +71,3 @@ def publish_best_cards(day: date, cards: list[dict[str, Any]]) -> None:
 
 def confidence_label(score: float, high: float, medium: float) -> str:
     return "HIGH" if score >= high else "MEDIUM" if score >= medium else "LOW"
-
