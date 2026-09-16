@@ -13,6 +13,24 @@ function sendNhlGameEmailIfFresh() { sendNhlTableIfFresh_(NHL_GAME_TAB, 'Daily N
 function sendNhlGoalEmailIfFresh() { sendNhlTableIfFresh_(NHL_GOAL_TAB, 'Daily NHL Goal Scorer Picks', 'nhl_goal'); }
 function sendNhlBestCardEmailIfFresh() { sendNhlTableIfFresh_(NHL_CARD_TAB, 'Daily NHL Best Cards', 'nhl_card'); }
 
+function sendNhlTestEmails() {
+  sendNhlTestTable_(NHL_GAME_TAB, '[TEST] Daily NHL Game Picks');
+  sendNhlTestTable_(NHL_GOAL_TAB, '[TEST] Daily NHL Goal Scorer Picks');
+  sendNhlTestTable_(NHL_CARD_TAB, '[TEST] Daily NHL Best Cards');
+}
+
+function sendNhlTestTable_(tabName, subjectPrefix) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tabName);
+  if (!sheet || sheet.getLastRow() < 2) throw new Error(tabName + ' has no test data.');
+  var data = sheet.getDataRange().getDisplayValues();
+  var runDate = data[1][0];
+  var props = PropertiesService.getScriptProperties();
+  var recipient = props.getProperty('NHL_EMAIL_TO') || Session.getEffectiveUser().getEmail();
+  if (!recipient) throw new Error('Set Script Property NHL_EMAIL_TO to the delivery email address.');
+  GmailApp.sendEmail(recipient, subjectPrefix + ' - ' + runDate,
+    'Open this email in HTML view.', {htmlBody: buildNhlEmailHtml_(subjectPrefix, runDate, data)});
+}
+
 function sendNhlTableIfFresh_(tabName, subjectPrefix, markerPrefix) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(tabName);
@@ -58,4 +76,3 @@ function installNhlEmailTrigger() {
   });
   ScriptApp.newTrigger('sendDailyNhlEmailsIfFresh').timeBased().everyHours(1).create();
 }
-
