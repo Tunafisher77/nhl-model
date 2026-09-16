@@ -53,17 +53,77 @@ function sendNhlTableIfFresh_(tabName, subjectPrefix, markerPrefix) {
 }
 
 function buildNhlEmailHtml_(title, runDate, data) {
-  var html = '<div style="font-family:Arial,sans-serif;max-width:1000px;margin:auto">' +
-    '<h2 style="color:#163a63">' + escapeNhl_(title) + '</h2><p><b>' + escapeNhl_(runDate) + '</b></p>' +
-    '<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>';
-  data[0].forEach(function(v) { html += '<th style="background:#163a63;color:white;padding:8px;border:1px solid #ccc">' + escapeNhl_(v) + '</th>'; });
-  html += '</tr></thead><tbody>';
-  for (var r = 1; r < data.length; r++) {
-    html += '<tr style="background:' + (r % 2 ? '#f4f7fb' : '#fff') + '">';
-    data[r].forEach(function(v) { html += '<td style="padding:7px;border:1px solid #ccc">' + escapeNhl_(v) + '</td>'; });
-    html += '</tr>';
+  var html = '<div style="font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.45">' +
+    '<h2>' + escapeNhl_(title) + '</h2>' +
+    '<p><strong>Slate Date:</strong> ' + escapeNhl_(runDate) + '</p>';
+  var headers = data[0];
+  var rows = data.slice(1).map(function(row) { return nhlRowObject_(headers, row); });
+  if (title.indexOf('Best Card') !== -1 || title.indexOf('Best Cards') !== -1) {
+    html += buildNhlBestCards_(rows);
+  } else if (title.indexOf('Goal Scorer') !== -1) {
+    html += buildNhlGoalScorers_(rows);
+  } else {
+    html += buildNhlGames_(rows);
   }
-  return html + '</tbody></table><p style="color:#666;font-size:11px">Statistics-only model; no betting lines.</p></div>';
+  return html + '<p style="color:#666;font-size:12px;margin-top:24px">' +
+    'Statistics-only selections. No sportsbook odds, lines, implied probabilities, or market influence are used.' +
+    '</p></div>';
+}
+
+function nhlRowObject_(headers, row) {
+  var obj = {};
+  headers.forEach(function(header, index) { obj[header] = row[index] || ''; });
+  return obj;
+}
+
+function buildNhlGames_(rows) {
+  var html = '<h3>Daily Outlook</h3><p>' + rows.length +
+    ' regular-season games evaluated using team strength, goal differential, recent form, and home ice.</p>';
+  rows.forEach(function(row) {
+    html += '<br><h3>' + escapeNhl_(row.Matchup) + '</h3>' +
+      '<p><strong>Projected Winner:</strong> ' + escapeNhl_(row.Pick) + '<br>' +
+      '<strong>Win Probability:</strong> ' + escapeNhl_(row['Win Probability']) + '%<br>' +
+      '<strong>Confidence:</strong> ' + escapeNhl_(row.Confidence) + '<br>' +
+      '<strong>Game Time:</strong> ' + escapeNhl_(row['Start UTC']) + '<br>' +
+      '<strong>Why Today:</strong> ' + escapeNhl_(row.Reason) + '</p>';
+  });
+  return html;
+}
+
+function buildNhlGoalScorers_(rows) {
+  var html = '<h3>Top Goal Scorer Picks</h3>';
+  rows.forEach(function(row, index) {
+    html += '<p><strong>' + (index + 1) + '. ' + escapeNhl_(row.Player) +
+      ' (' + escapeNhl_(row.Team) + ')</strong><br>' +
+      '<strong>Matchup:</strong> ' + escapeNhl_(row.Matchup) + '<br>' +
+      '<strong>Goal Score:</strong> ' + escapeNhl_(row['Goal Score']) + '<br>' +
+      '<strong>Goals/Game:</strong> ' + escapeNhl_(row['Goal Rate']) + '<br>' +
+      '<strong>Shots/Game:</strong> ' + escapeNhl_(row['Shots/Game']) + '<br>' +
+      '<strong>Confidence:</strong> ' + escapeNhl_(row.Confidence) + '</p>';
+  });
+  return html;
+}
+
+function buildNhlBestCards_(rows) {
+  var cards = {};
+  rows.forEach(function(row) {
+    if (!cards[row.Card]) cards[row.Card] = [];
+    cards[row.Card].push(row);
+  });
+  var html = '';
+  Object.keys(cards).sort(function(a, b) { return Number(a) - Number(b); }).forEach(function(card) {
+    var picks = cards[card];
+    html += '<br><h3>Card ' + escapeNhl_(card) + ' — ' + escapeNhl_(picks[0].Matchup) + '</h3>';
+    picks.forEach(function(pick) {
+      html += '<p><strong>' + escapeNhl_(pick['Pick Type']) + ':</strong> ' +
+        escapeNhl_(pick.Selection);
+      if (pick.Team && pick.Team !== pick.Selection) html += ' (' + escapeNhl_(pick.Team) + ')';
+      if (pick['Model Score']) html += '<br><strong>Model Score:</strong> ' + escapeNhl_(pick['Model Score']);
+      html += '<br><strong>Confidence:</strong> ' + escapeNhl_(pick.Confidence) + '</p>';
+    });
+  });
+  html += '<h3>Model Notes</h3><p>Each card contains one projected game winner, one goal scorer from each team, two assist candidates, and two shots-on-goal candidates.</p>';
+  return html;
 }
 
 function escapeNhl_(value) {
