@@ -18,10 +18,11 @@ No betting lines are ingested or used.
 
 Scheduled production is gated until **2026-09-29**, the first day of the 2026-27 regular season. Preseason games are excluded by NHL `gameType=2` validation.
 
-## Required GitHub secrets
+## Required GitHub secret
 
-- `GOOGLE_SERVICE_ACCOUNT_JSON`: the complete service-account JSON used for Google Sheets.
 - `NHL_SPREADSHEET_ID`: ID of the Google workbook shared with that service account.
+
+Google authentication uses the same keyless Workload Identity Federation provider and service account as the NFL model. No downloaded JSON key is required.
 
 The workflow runs at 13:05, 13:35, and 14:05 UTC. Multiple attempts cover Pacific daylight/standard time and transient upstream failures. Apps Script sent markers prevent duplicate emails.
 
