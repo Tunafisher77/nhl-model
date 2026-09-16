@@ -19,3 +19,11 @@ def test_current_season_weight_is_capped():
                        {"gamesPlayed": 80, "goals": 0, "assists": 40, "shots": 160, "points": 40})
     assert round(row["goal_rate"], 3) == .75
 
+
+def test_nhl_roster_name_shape_is_documented():
+    row = {"firstName": {"default": "Connor"}, "lastName": {"default": "McDavid"}}
+    name = " ".join(part for part in (
+        row.get("firstName", {}).get("default", "").strip(),
+        row.get("lastName", {}).get("default", "").strip(),
+    ) if part)
+    assert name == "Connor McDavid"
