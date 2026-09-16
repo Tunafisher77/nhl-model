@@ -128,6 +128,10 @@ def fetch_roster(team: str) -> list[dict[str, Any]]:
         for row in payload.get(group, []):
             player_id = row.get("id")
             name = row.get("fullName", {}).get("default")
+            if not name:
+                first = row.get("firstName", {}).get("default", "").strip()
+                last = row.get("lastName", {}).get("default", "").strip()
+                name = " ".join(part for part in (first, last) if part)
             if player_id and name:
                 players.append({"player_id": int(player_id), "name": name, "position": row.get("positionCode", "")})
     return players
@@ -171,4 +175,3 @@ def chunked(values: Iterable[Any], size: int) -> Iterable[list[Any]]:
             batch = []
     if batch:
         yield batch
-
