@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: daily-nhl-${{ github.event.inputs.target_date || 'today' }}
@@ -35,9 +36,13 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python -m pytest -q
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/457900160143/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: mlb-hr-model@mlb-hr-model-498322.iam.gserviceaccount.com
       - name: Generate and publish NHL picks
         env:
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           NHL_SPREADSHEET_ID: ${{ secrets.NHL_SPREADSHEET_ID }}
           NHL_TARGET_DATE: ${{ github.event.inputs.target_date }}
           NHL_DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
