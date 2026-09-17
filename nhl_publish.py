@@ -40,6 +40,22 @@ def replace_rows(title: str, headers: list[str], rows: list[list[Any]]) -> None:
                               "horizontalAlignment": "CENTER"})
 
 
+def append_unique_rows(title: str, headers: list[str], rows: list[list[Any]], key_columns: int) -> None:
+    book = _client().open_by_key(os.environ["NHL_SPREADSHEET_ID"])
+    sheet = _sheet(book, title, rows=max(1000, len(rows) + 20), cols=max(12, len(headers)))
+    existing = sheet.get_all_values()
+    if existing and existing[0] != headers:
+        raise RuntimeError(f"Refusing to write {title}: header schema mismatch")
+    if not existing:
+        sheet.update(values=[headers], range_name=f"A1:{gspread.utils.rowcol_to_a1(1, len(headers))}")
+        existing = [headers]
+    keys = {tuple(row[:key_columns]) for row in existing[1:]}
+    new_rows = [row for row in rows if tuple(str(v) for v in row[:key_columns]) not in keys]
+    if new_rows:
+        sheet.append_rows(new_rows, value_input_option="USER_ENTERED")
+    sheet.freeze(rows=1)
+
+
 def publish_game_email(day: date, rows: list[dict[str, Any]]) -> None:
     headers = ["Run Date", "Game ID", "Start UTC", "Matchup", "Pick", "Win Probability", "Confidence", "Reason"]
     values = [[day.isoformat(), r["game_id"], r["start_time_utc"], f'{r["away"]} at {r["home"]}', r["pick"],
@@ -66,6 +82,9 @@ def publish_best_cards(day: date, cards: list[dict[str, Any]]) -> None:
             values.append(base + ["Player Assist", p["name"], p["team"], p["assist_score"], confidence_label(p["assist_score"], 40, 28)])
         for p in card["shots"]:
             values.append(base + ["Shots on Goal", p["name"], p["team"], p["shot_score"], confidence_label(p["shot_score"], 80, 60)])
+    history_headers = headers + ["Game Status", "Final Score", "Actual", "Result", "Graded At UTC"]
+    history_values = [row + ["Pending", "", "", "", ""] for row in values]
+    append_unique_rows("NHL Best Card Results", history_headers, history_values, key_columns=6)
     replace_rows("NHL Best Card Email Summary", headers, values)
 
 

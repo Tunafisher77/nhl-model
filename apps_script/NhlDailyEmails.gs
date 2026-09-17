@@ -1,6 +1,7 @@
 var NHL_GAME_TAB = 'NHL Game Email Summary';
 var NHL_GOAL_TAB = 'NHL Goal Scorer Email Summary';
 var NHL_CARD_TAB = 'NHL Best Card Email Summary';
+var NHL_CARD_RESULTS_TAB = 'NHL Best Card Results Email Summary';
 var NHL_TZ = 'America/Los_Angeles';
 
 function sendDailyNhlEmailsIfFresh() {
@@ -59,6 +60,8 @@ function buildNhlEmailHtml_(title, runDate, data) {
   var headers = data[0];
   var rows = data.slice(1).map(function(row) { return nhlRowObject_(headers, row); });
   if (title.indexOf('Best Card') !== -1 || title.indexOf('Best Cards') !== -1) {
+    html += buildNhlYesterdayResults_();
+    html += '<h2 style="margin-top:26px">Today\'s Best Cards</h2>';
     html += buildNhlBestCards_(rows);
   } else if (title.indexOf('Goal Scorer') !== -1) {
     html += buildNhlGoalScorers_(rows);
@@ -68,6 +71,42 @@ function buildNhlEmailHtml_(title, runDate, data) {
   return html + '<p style="color:#666;font-size:12px;margin-top:24px">' +
     'Statistics-only selections. No sportsbook odds, lines, implied probabilities, or market influence are used.' +
     '</p></div>';
+}
+
+function buildNhlYesterdayResults_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NHL_CARD_RESULTS_TAB);
+  if (!sheet || sheet.getLastRow() < 2) {
+    return '<h2>Yesterday\'s Results</h2><p style="color:#666">No completed Best Card results are available yet.</p>';
+  }
+  var data = sheet.getDataRange().getDisplayValues();
+  var headers = data[0];
+  var rows = data.slice(1).map(function(row) { return nhlRowObject_(headers, row); });
+  var date = rows[0]['Result Date'] || '';
+  var hits = rows.filter(function(row) { return row.Result === 'HIT'; }).length;
+  var misses = rows.filter(function(row) { return row.Result === 'MISS'; }).length;
+  var graded = hits + misses;
+  var html = '<h2>Yesterday\'s Results</h2><p><strong>Card Date:</strong> ' + escapeNhl_(date) +
+    '<br><strong>Overall:</strong> ' + hits + '-' + misses +
+    (graded ? ' (' + Math.round(100 * hits / graded) + '%)' : '') + '</p>';
+  var cards = {};
+  rows.forEach(function(row) {
+    if (!cards[row.Card]) cards[row.Card] = [];
+    cards[row.Card].push(row);
+  });
+  Object.keys(cards).sort(function(a, b) { return Number(a) - Number(b); }).forEach(function(card) {
+    var picks = cards[card];
+    html += '<h3>Card ' + escapeNhl_(card) + ' — ' + escapeNhl_(picks[0].Matchup) + '</h3>';
+    if (picks[0]['Final Score']) html += '<p><strong>Final:</strong> ' + escapeNhl_(picks[0]['Final Score']) + '</p>';
+    picks.forEach(function(pick) {
+      var color = pick.Result === 'HIT' ? '#16794b' : (pick.Result === 'MISS' ? '#b42318' : '#666');
+      html += '<p style="margin:5px 0"><strong>' + escapeNhl_(pick['Pick Type']) + ':</strong> ' +
+        escapeNhl_(pick.Selection) + ' — <strong style="color:' + color + '">' +
+        escapeNhl_(pick.Result || pick.Status) + '</strong>';
+      if (pick.Actual !== '') html += ' (actual: ' + escapeNhl_(pick.Actual) + ')';
+      html += '</p>';
+    });
+  });
+  return html;
 }
 
 function nhlRowObject_(headers, row) {
