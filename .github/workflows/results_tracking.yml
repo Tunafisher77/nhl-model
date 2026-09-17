@@ -1,0 +1,47 @@
+name: NHL Results Tracking
+
+on:
+  schedule:
+    - cron: '30 12 * * *'
+    - cron: '30 13 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Pacific run window
+        id: pacific
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(TZ=America/Los_Angeles date +%H)" = "05" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.pacific.outputs.run == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.pacific.outputs.run == 'true'
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+        if: steps.pacific.outputs.run == 'true'
+      - run: python -m pytest -q
+        if: steps.pacific.outputs.run == 'true'
+      - name: Authenticate to Google Cloud
+        if: steps.pacific.outputs.run == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/457900160143/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: mlb-hr-model@mlb-hr-model-498322.iam.gserviceaccount.com
+      - name: Grade yesterday and publish email summary
+        if: steps.pacific.outputs.run == 'true'
+        env:
+          NHL_SPREADSHEET_ID: ${{ secrets.NHL_SPREADSHEET_ID }}
+        run: python nhl_results_tracker.py
