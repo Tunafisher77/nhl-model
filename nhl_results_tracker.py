@@ -12,6 +12,7 @@ from nhl_publish import _client, _sheet
 
 HISTORY_TAB = "NHL Best Card Results"
 SUMMARY_TAB = "NHL Best Card Results Email Summary"
+PUBLISHED_TAB = "NHL Best Card Email Summary"
 HEADERS = ["Run Date", "Card", "Game ID", "Matchup", "Pick Type", "Selection", "Team",
            "Model Score", "Confidence", "Game Status", "Final Score", "Actual", "Result", "Graded At UTC"]
 SUMMARY_HEADERS = ["Result Date", "Card", "Matchup", "Final Score", "Pick Type", "Selection", "Actual", "Result", "Status"]
@@ -103,9 +104,43 @@ def run() -> dict[str, int]:
         row.update({"Game Status": status, "Final Score": score, "Actual": actual, "Result": result})
 
     result_date = (datetime.now(PACIFIC).date() - timedelta(days=1)).isoformat()
+
+    # Use the exact final card that was published for the result date. History may
+    # contain revised same-day selections from reruns; those older versions must
+    # not be mixed into the email or historical card totals.
+    published = _records(book.worksheet(PUBLISHED_TAB).get_all_values())
+    published_for_date = [
+        row for row in published if row.get("Run Date") == result_date
+    ]
+    if not published_for_date:
+        raise RuntimeError(
+            f"No final published NHL Best Card snapshot is available for {result_date}."
+        )
+    published_keys = {
+        (
+            row.get("Run Date", ""),
+            row.get("Card", ""),
+            row.get("Game ID", ""),
+            row.get("Matchup", ""),
+            row.get("Pick Type", ""),
+            row.get("Selection", ""),
+        )
+        for row in published_for_date
+    }
+    final_rows = [
+        row for row in records
+        if (
+            row.get("Run Date", ""),
+            row.get("Card", ""),
+            row.get("Game ID", ""),
+            row.get("Matchup", ""),
+            row.get("Pick Type", ""),
+            row.get("Selection", ""),
+        ) in published_keys
+    ]
     output = [[result_date, r["Card"], r["Matchup"], r["Final Score"], r["Pick Type"],
                r["Selection"], r["Actual"], r["Result"], r["Game Status"]]
-              for r in records if r.get("Run Date") == result_date]
+              for r in final_rows]
     summary = _sheet(book, SUMMARY_TAB, rows=100, cols=len(SUMMARY_HEADERS))
     summary.clear()
     summary.update(values=[SUMMARY_HEADERS] + output,
