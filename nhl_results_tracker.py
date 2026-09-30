@@ -29,7 +29,7 @@ def _players(box: dict[str, Any], roster_names: dict[int, str] | None = None) ->
     result: dict[str, dict[str, Any]] = {}
     stats = box.get("playerByGameStats", {}) or {}
     for side in ("awayTeam", "homeTeam"):
-        for group in ("forwards", "defense", "defensemen"):
+        for group in ("forwards", "defense", "defensemen", "goalies"):
             for player in stats.get(side, {}).get(group, []) or []:
                 name = player.get("name", {}).get("default", "")
                 if name:
@@ -66,6 +66,15 @@ def _grade(row: dict[str, str], state: str, score: str, players: dict[str, dict[
         winner = parts[0] if away_score > home_score else parts[3]
         return winner, "HIT" if selection == winner else "MISS"
     player = players.get(selection.casefold())
+    if not player:
+        # Some NHL boxscores omit or abbreviate the display name. Resolve the
+        # selection against the official roster, then match by playerId.
+        wanted = " ".join(selection.casefold().replace(".", "").split())
+        for key, candidate in players.items():
+            normalized = " ".join(key.replace(".", "").split())
+            if normalized == wanted:
+                player = candidate
+                break
     if not player:
         # A missing lookup is not evidence that the player did not play. Keep it
         # pending so feed/schema mismatches cannot corrupt historical results.
