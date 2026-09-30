@@ -7,7 +7,7 @@ from typing import Any
 import gspread
 
 from nhl_common import PACIFIC, WEB_API, get_json
-from nhl_publish import _client, _sheet
+from nhl_publish import _client, _sheet, append_unique_rows
 
 
 HISTORY_TAB = "NHL Best Card Results"
@@ -85,6 +85,14 @@ def run() -> dict[str, int]:
         values = [HEADERS]
     if values[0] != HEADERS:
         raise RuntimeError("NHL Best Card Results header schema mismatch")
+    # Recover the exact published prior-day snapshot before today's publication.
+    result_date = (datetime.now(PACIFIC).date() - timedelta(days=1)).isoformat()
+    snapshot = _records(book.worksheet(PUBLISHED_TAB).get_all_values())
+    snapshot_rows = [[row.get(h, "") for h in HEADERS[:9]] + ["Pending", "", "", "", ""]
+                     for row in snapshot if row.get("Run Date") == result_date]
+    if snapshot_rows:
+        append_unique_rows(HISTORY_TAB, HEADERS, snapshot_rows, key_columns=6)
+        values = history.get_all_values()
     records = _records(values)
     cache: dict[str, tuple[str, str, dict[str, dict[str, Any]]]] = {}
     graded = 0
