@@ -29,7 +29,7 @@ def _players(box: dict[str, Any], roster_names: dict[int, str] | None = None) ->
     result: dict[str, dict[str, Any]] = {}
     stats = box.get("playerByGameStats", {}) or {}
     for side in ("awayTeam", "homeTeam"):
-        for group in ("forwards", "defense"):
+        for group in ("forwards", "defense", "defensemen"):
             for player in stats.get(side, {}).get(group, []) or []:
                 name = player.get("name", {}).get("default", "")
                 if name:
@@ -67,7 +67,9 @@ def _grade(row: dict[str, str], state: str, score: str, players: dict[str, dict[
         return winner, "HIT" if selection == winner else "MISS"
     player = players.get(selection.casefold())
     if not player:
-        return "DNP", "DNP"
+        # A missing lookup is not evidence that the player did not play. Keep it
+        # pending so feed/schema mismatches cannot corrupt historical results.
+        return "", "Pending"
     if pick_type == "Goal Scorer":
         actual = int(player.get("goals", 0) or 0)
         return str(actual), "HIT" if actual >= 1 else "MISS"
