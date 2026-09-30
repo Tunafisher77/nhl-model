@@ -13,6 +13,8 @@ on:
         default: false
         type: boolean
   schedule:
+    # Prepare data before the 6 AM Pacific mailer in daylight and standard time.
+    - cron: '10,40 12 * * *'
     - cron: '0,35 13 * * *'
     - cron: '0,35 14 * * *'
 
