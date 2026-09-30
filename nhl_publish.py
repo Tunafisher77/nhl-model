@@ -43,7 +43,10 @@ def replace_rows(title: str, headers: list[str], rows: list[list[Any]]) -> None:
 def append_unique_rows(title: str, headers: list[str], rows: list[list[Any]], key_columns: int) -> None:
     book = _client().open_by_key(os.environ["NHL_SPREADSHEET_ID"])
     sheet = _sheet(book, title, rows=max(1000, len(rows) + 20), cols=max(12, len(headers)))
-    existing = sheet.get_all_values()
+    existing = [row for row in sheet.get_all_values() if any(str(v).strip() for v in row)]
+    if existing:
+        while existing[0] and not str(existing[0][-1]).strip():
+            existing[0].pop()
     if existing and existing[0] != headers:
         raise RuntimeError(f"Refusing to write {title}: header schema mismatch")
     if not existing:
