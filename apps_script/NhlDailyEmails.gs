@@ -195,3 +195,7 @@ function installNhlEmailTrigger() {
   console.log('Installed daily 6 AM America/Los_Angeles send and 5-minute morning recovery checks.');
 }
 
+
+function sendNhlCorrectedBestCardEmail() {
+  sendNhlTableIfFresh_(NHL_CARD_TAB, '[UPDATED RESULTS] Daily NHL Best Cards', 'nhl_card_corrected_results');
+}
