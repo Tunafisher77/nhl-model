@@ -109,11 +109,27 @@ def _stats_query(report: str, season: int) -> list[dict[str, Any]]:
         "isAggregate": "false",
         "isGame": "false",
         "start": 0,
-        "limit": 5000,
+        "limit": 100,
         "sort": json.dumps([{"property": "points", "direction": "DESC"}]),
         "cayenneExp": f"seasonId={season} and gameTypeId=2",
     }
-    return get_json(f"{STATS_API}/{report}", params=params).get("data", [])
+    rows: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for start in range(0, 10000, 100):
+        params["start"] = start
+        payload = get_json(f"{STATS_API}/{report}", params=params)
+        page = payload.get("data", [])
+        if not page:
+            return rows
+        ids = {int(row["playerId"]) for row in page if row.get("playerId")}
+        if ids and ids <= seen:
+            raise DataError("NHL stats pagination returned a repeated page")
+        seen.update(ids)
+        rows.extend(page)
+        total = payload.get("total")
+        if len(page) < 100 or (total is not None and len(rows) >= int(total)):
+            return rows
+    raise DataError("NHL stats exceeded the pagination safety limit")
 
 
 def fetch_skater_stats(season: int) -> dict[int, dict[str, Any]]:
