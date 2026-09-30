@@ -34,6 +34,8 @@ def run() -> dict:
     if not game_rows or not goal_rows or not cards:
         raise RuntimeError("Fail closed: one or more email models produced no verified output")
     if os.getenv("NHL_DRY_RUN") != "1":
+        from nhl_results_tracker import run as grade_results
+        grade_results()
         publish_game_email(day, game_rows)
         publish_goal_email(day, goal_rows)
         publish_best_cards(day, cards)
