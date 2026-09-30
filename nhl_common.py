@@ -153,6 +153,25 @@ def fetch_roster(team: str) -> list[dict[str, Any]]:
     return players
 
 
+
+def fetch_game_active_player_ids(game_id: int) -> set[int]:
+    """Return skater IDs confirmed on the NHL gamecenter roster/boxscore.
+
+    An empty set means the feed does not yet provide a usable active roster, so
+    callers should fail closed rather than silently treating everyone as active.
+    """
+    payload = get_json(f"{WEB_API}/gamecenter/{game_id}/boxscore")
+    stats = payload.get("playerByGameStats", {}) or {}
+    active: set[int] = set()
+    for side in ("awayTeam", "homeTeam"):
+        side_stats = stats.get(side, {}) or {}
+        for group in ("forwards", "defense", "defensemen"):
+            for row in side_stats.get(group, []) or []:
+                player_id = row.get("playerId")
+                if player_id:
+                    active.add(int(player_id))
+    return active
+
 def blend_player(current: dict[str, Any] | None, prior: dict[str, Any] | None) -> dict[str, float]:
     current = current or {}
     prior = prior or {}
