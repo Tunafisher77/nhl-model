@@ -5,9 +5,18 @@ var NHL_CARD_RESULTS_TAB = 'NHL Best Card Results Email Summary';
 var NHL_TZ = 'America/Los_Angeles';
 
 function sendDailyNhlEmailsIfFresh() {
-  sendNhlTableIfFresh_(NHL_GAME_TAB, 'Daily NHL Game Picks', 'nhl_game');
-  sendNhlTableIfFresh_(NHL_GOAL_TAB, 'Daily NHL Goal Scorer Picks', 'nhl_goal');
-  sendNhlTableIfFresh_(NHL_CARD_TAB, 'Daily NHL Best Cards', 'nhl_card');
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return;
+  var errors = [];
+  try {
+    [[NHL_GAME_TAB, 'Daily NHL Game Picks', 'nhl_game'],
+     [NHL_GOAL_TAB, 'Daily NHL Goal Scorer Picks', 'nhl_goal'],
+     [NHL_CARD_TAB, 'Daily NHL Best Cards', 'nhl_card']].forEach(function(report) {
+      try { sendNhlTableIfFresh_(report[0], report[1], report[2]); }
+      catch (error) { errors.push(report[0] + ': ' + error.message); }
+    });
+  } finally { lock.releaseLock(); }
+  if (errors.length) throw new Error(errors.join('; '));
 }
 
 function sendNhlGameEmailIfFresh() { sendNhlTableIfFresh_(NHL_GAME_TAB, 'Daily NHL Game Picks', 'nhl_game'); }
@@ -51,6 +60,7 @@ function sendNhlTableIfFresh_(tabName, subjectPrefix, markerPrefix) {
   var html = buildNhlEmailHtml_(subjectPrefix, runDate, data);
   GmailApp.sendEmail(recipient, subjectPrefix + ' - ' + runDate, 'Open this email in HTML view.', {htmlBody: html});
   props.setProperty(marker, new Date().toISOString());
+  console.log('SENT: ' + subjectPrefix + ' - ' + runDate);
 }
 
 function buildNhlEmailHtml_(title, runDate, data) {
@@ -169,9 +179,19 @@ function escapeNhl_(value) {
   return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function runNhlMorningEmailChecks() {
+  var hour = Number(Utilities.formatDate(new Date(), NHL_TZ, 'H'));
+  if (hour >= 6 && hour < 12) sendDailyNhlEmailsIfFresh();
+}
+
 function installNhlEmailTrigger() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'sendDailyNhlEmailsIfFresh') ScriptApp.deleteTrigger(t);
+    if (t.getHandlerFunction() === 'sendDailyNhlEmailsIfFresh' ||
+        t.getHandlerFunction() === 'runNhlMorningEmailChecks') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('sendDailyNhlEmailsIfFresh').timeBased().everyHours(1).create();
+  ScriptApp.newTrigger('sendDailyNhlEmailsIfFresh').timeBased()
+    .atHour(6).nearMinute(0).everyDays(1).inTimezone(NHL_TZ).create();
+  ScriptApp.newTrigger('runNhlMorningEmailChecks').timeBased().everyMinutes(5).create();
+  console.log('Installed daily 6 AM America/Los_Angeles send and 5-minute morning recovery checks.');
 }
+
