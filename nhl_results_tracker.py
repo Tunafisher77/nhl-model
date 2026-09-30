@@ -76,7 +76,10 @@ def _grade(row: dict[str, str], state: str, score: str, players: dict[str, dict[
 def run() -> dict[str, int]:
     book = _client().open_by_key(os.environ["NHL_SPREADSHEET_ID"])
     history = _sheet(book, HISTORY_TAB, rows=5000, cols=len(HEADERS))
-    values = history.get_all_values()
+    values = [row for row in history.get_all_values() if any(str(v).strip() for v in row)]
+    if values:
+        while values[0] and not str(values[0][-1]).strip():
+            values[0].pop()
     if not values:
         history.update(values=[HEADERS], range_name="A1:N1")
         values = [HEADERS]
