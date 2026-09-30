@@ -124,9 +124,9 @@ def run() -> dict[str, int]:
         row for row in published if row.get("Run Date") == result_date
     ]
     if not published_for_date:
-        raise RuntimeError(
-            f"No final published NHL Best Card snapshot is available for {result_date}."
-        )
+        # The morning publication may already have replaced the live snapshot.
+        # Recover only this prior date's archived selections.
+        published_for_date = [row for row in records if row.get("Run Date") == result_date]
     published_keys = {
         (
             row.get("Run Date", ""),
