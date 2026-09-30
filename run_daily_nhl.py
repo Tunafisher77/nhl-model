@@ -27,6 +27,10 @@ def run() -> dict:
     game_rows = evaluate_games(games, standings)
     goal_rows = goal_scorer_email(games, pool, day)
     cards = best_cards(games, game_rows, pool, day)
+    print(json.dumps({"date": day.isoformat(), "scheduled_games": len(games),
+                      "current_stat_players": len(current), "prior_stat_players": len(prior),
+                      "eligible_players_by_team": {team: len(players) for team, players in pool.items()},
+                      "game_picks": len(game_rows), "goal_picks": len(goal_rows), "cards": len(cards)}))
     if not game_rows or not goal_rows or not cards:
         raise RuntimeError("Fail closed: one or more email models produced no verified output")
     if os.getenv("NHL_DRY_RUN") != "1":
