@@ -6,7 +6,7 @@ from typing import Any
 
 import gspread
 
-from nhl_common import PACIFIC, WEB_API, get_json
+from nhl_common import PACIFIC, WEB_API, get_json, fetch_roster
 from nhl_publish import _client, _sheet, append_unique_rows
 
 
@@ -25,7 +25,7 @@ def _records(values: list[list[str]]) -> list[dict[str, str]]:
             for row in values[1:] if any(str(v).strip() for v in row)]
 
 
-def _players(box: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def _players(box: dict[str, Any], roster_names: dict[int, str] | None = None) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     stats = box.get("playerByGameStats", {}) or {}
     for side in ("awayTeam", "homeTeam"):
@@ -34,6 +34,9 @@ def _players(box: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 name = player.get("name", {}).get("default", "")
                 if name:
                     result[name.casefold()] = player
+                full_name = (roster_names or {}).get(int(player.get("playerId", 0) or 0))
+                if full_name:
+                    result[full_name.casefold()] = player
     return result
 
 
@@ -45,7 +48,11 @@ def _game_details(game_id: str) -> tuple[str, str, dict[str, dict[str, Any]]]:
     away_name = away.get("abbrev", "AWAY")
     home_name = home.get("abbrev", "HOME")
     score = f"{away_name} {away.get('score', '')} - {home_name} {home.get('score', '')}" if state in {"OFF", "FINAL"} else ""
-    return state, score, _players(box)
+    roster_names = {}
+    for team in (away_name, home_name):
+        for player in fetch_roster(team):
+            roster_names[player["player_id"]] = player["name"]
+    return state, score, _players(box, roster_names)
 
 
 def _grade(row: dict[str, str], state: str, score: str, players: dict[str, dict[str, Any]]) -> tuple[str, str]:
@@ -97,7 +104,7 @@ def run() -> dict[str, int]:
     cache: dict[str, tuple[str, str, dict[str, dict[str, Any]]]] = {}
     graded = 0
     for index, row in enumerate(records, start=2):
-        if row.get("Result") not in {"", "Pending"}:
+        if row.get("Result") not in {"", "Pending", "DNP"}:
             continue
         game_id = row.get("Game ID", "")
         if not game_id:
