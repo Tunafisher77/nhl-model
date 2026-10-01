@@ -134,12 +134,17 @@ def run() -> dict[str, int]:
         state, score, players = cache[game_id]
         actual, result = _grade(row, state, score, players)
         status = "Final" if state in {"OFF", "FINAL"} else state or "Pending"
-        history.update(values=[[status, score, actual, result,
-                                datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC") if status == "Final" else ""]],
-                       range_name=f"J{index}:N{index}")
+        # Do not overwrite a previously final grade with a transient Pending
+        # response from the NHL API. This is especially important during morning
+        # recovery runs when one boxscore may be temporarily unavailable.
+        if status == "Final" or row.get("Game Status") not in {"Final"}:
+            history.update(values=[[status, score, actual, result,
+                                    datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC") if status == "Final" else ""]],
+                           range_name=f"J{index}:N{index}")
         if status == "Final":
             graded += 1
-        row.update({"Game Status": status, "Final Score": score, "Actual": actual, "Result": result})
+        if status == "Final" or row.get("Game Status") not in {"Final"}:
+            row.update({"Game Status": status, "Final Score": score, "Actual": actual, "Result": result})
 
     result_date = (datetime.now(PACIFIC).date() - timedelta(days=1)).isoformat()
 
