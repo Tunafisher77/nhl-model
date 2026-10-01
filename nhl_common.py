@@ -58,12 +58,21 @@ def get_json(url: str, *, params: dict[str, Any] | None = None, attempts: int = 
     for attempt in range(attempts):
         try:
             response = requests.get(url, params=params, timeout=30)
+            if response.status_code == 429 and attempt + 1 < attempts:
+                retry_after = response.headers.get("Retry-After")
+                try:
+                    delay = max(float(retry_after), 5.0) if retry_after else min(15.0 * (attempt + 1), 45.0)
+                except (TypeError, ValueError):
+                    delay = min(15.0 * (attempt + 1), 45.0)
+                print(f"Warning: NHL rate limit for {url}; retrying in {delay:.0f}s")
+                time.sleep(delay)
+                continue
             response.raise_for_status()
             return response.json()
         except (requests.RequestException, ValueError) as exc:
             last = exc
             if attempt + 1 < attempts:
-                time.sleep(2 ** attempt)
+                time.sleep(min(2 ** attempt, 8))
     raise DataError(f"NHL request failed after {attempts} attempts: {url}: {last}")
 
 
