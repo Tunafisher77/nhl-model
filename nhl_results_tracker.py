@@ -41,7 +41,13 @@ def _players(box: dict[str, Any], roster_names: dict[int, str] | None = None) ->
 
 
 def _game_details(game_id: str) -> tuple[str, str, dict[str, dict[str, Any]]]:
-    box = get_json(f"{WEB_API}/gamecenter/{game_id}/boxscore")
+    """Return grading details without allowing NHL API throttling to stop today's picks."""
+    try:
+        box = get_json(f"{WEB_API}/gamecenter/{game_id}/boxscore", attempts=3)
+    except Exception as exc:
+        print(f"Warning: results grading deferred for game {game_id}: {exc}")
+        return "", "", {}
+
     state = str(box.get("gameState", ""))
     away = box.get("awayTeam", {}) or {}
     home = box.get("homeTeam", {}) or {}
@@ -50,8 +56,11 @@ def _game_details(game_id: str) -> tuple[str, str, dict[str, dict[str, Any]]]:
     score = f"{away_name} {away.get('score', '')} - {home_name} {home.get('score', '')}" if state in {"OFF", "FINAL"} else ""
     roster_names = {}
     for team in (away_name, home_name):
-        for player in fetch_roster(team):
-            roster_names[player["player_id"]] = player["name"]
+        try:
+            for player in fetch_roster(team):
+                roster_names[player["player_id"]] = player["name"]
+        except Exception as exc:
+            print(f"Warning: roster-name enrichment unavailable for {team}: {exc}")
     return state, score, _players(box, roster_names)
 
 
