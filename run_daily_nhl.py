@@ -6,7 +6,7 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
-from nhl_common import PACIFIC, START_DATE, fetch_games, fetch_skater_stats, fetch_standings, previous_season_id, season_id, target_date, fetch_game_active_player_ids
+from nhl_common import PACIFIC, START_DATE, fetch_games, fetch_skater_stats, fetch_standings, previous_season_id, season_id, target_date, fetch_game_active_player_ids, fetch_roster
 from nhl_models import best_cards, build_player_pool, evaluate_games, goal_scorer_email
 from nhl_publish import publish_best_cards, publish_game_email, publish_goal_email
 
@@ -29,6 +29,13 @@ def run() -> dict:
     # eligible. If it is not available yet, keep the statistical pool rather than
     # guessing an inactive status; the morning recovery run can refresh it later.
     active_by_team: dict[str, set[int]] = {}
+    for team in ({g.away for g in games} | {g.home for g in games}):
+        try:
+            roster_ids = {p["player_id"] for p in fetch_roster(team)}
+            if roster_ids:
+                active_by_team[team] = roster_ids
+        except Exception as exc:
+            print(f"Warning: current-roster fallback unavailable for {team}: {exc}")
     for game in games:
         active = fetch_game_active_player_ids(game.game_id)
         if active:
