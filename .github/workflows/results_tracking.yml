@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '30 12 * * *'
     - cron: '30 13 * * *'
+    # Recovery grading after the morning API traffic has cooled down.
+    - cron: '30 15 * * *'
+    - cron: '30 16 * * *'
   workflow_dispatch:
 
 permissions:
@@ -18,7 +21,7 @@ jobs:
         id: pacific
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(TZ=America/Los_Angeles date +%H)" = "05" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [[ "$(TZ=America/Los_Angeles date +%H)" =~ ^(05|08|09)$ ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
