@@ -157,10 +157,18 @@ def fetch_roster(team: str) -> list[dict[str, Any]]:
 def fetch_game_active_player_ids(game_id: int) -> set[int]:
     """Return skater IDs confirmed on the NHL gamecenter roster/boxscore.
 
-    An empty set means the feed does not yet provide a usable active roster, so
-    callers should fail closed rather than silently treating everyone as active.
+    Active-roster verification is protective but non-critical. If the NHL
+    gamecenter endpoint is unavailable or rate-limited, return an empty set so
+    the caller keeps the statistical player pool instead of aborting the entire
+    daily email pipeline.
     """
-    payload = get_json(f"{WEB_API}/gamecenter/{game_id}/boxscore")
+    url = f"{WEB_API}/gamecenter/{game_id}/boxscore"
+    try:
+        payload = get_json(url, attempts=3)
+    except DataError as exc:
+        print(f"Warning: active-player verification unavailable for game {game_id}: {exc}")
+        return set()
+
     stats = payload.get("playerByGameStats", {}) or {}
     active: set[int] = set()
     for side in ("awayTeam", "homeTeam"):
