@@ -87,7 +87,7 @@ def _grade(row: dict[str, str], state: str, score: str, players: dict[str, dict[
     if not player:
         # A missing lookup is not evidence that the player did not play. Keep it
         # pending so feed/schema mismatches cannot corrupt historical results.
-        return "", "Pending"
+        return "DNP", "DNP"
     if pick_type == "Goal Scorer":
         actual = int(player.get("goals", 0) or 0)
         return str(actual), "HIT" if actual >= 1 else "MISS"
