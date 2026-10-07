@@ -54,13 +54,25 @@ function sendNhlTableIfFresh_(tabName, subjectPrefix, markerPrefix) {
   }
   var props = PropertiesService.getScriptProperties();
   var marker = markerPrefix + '_sent_' + runDate;
-  if (props.getProperty(marker)) return;
+  var fingerprint = nhlFingerprint_(data);
+  var previousFingerprint = props.getProperty(marker);
+  if (previousFingerprint === fingerprint) return;
   var recipient = props.getProperty('NHL_EMAIL_TO') || Session.getEffectiveUser().getEmail();
   if (!recipient) throw new Error('Set Script Property NHL_EMAIL_TO to the delivery email address.');
   var html = buildNhlEmailHtml_(subjectPrefix, runDate, data);
-  GmailApp.sendEmail(recipient, subjectPrefix + ' - ' + runDate, 'Open this email in HTML view.', {htmlBody: html});
-  props.setProperty(marker, new Date().toISOString());
-  console.log('SENT: ' + subjectPrefix + ' - ' + runDate);
+  var subject = (previousFingerprint ? '[UPDATED] ' : '') + subjectPrefix + ' - ' + runDate;
+  GmailApp.sendEmail(recipient, subject, 'Open this email in HTML view.', {htmlBody: html});
+  props.setProperty(marker, fingerprint);
+  console.log((previousFingerprint ? 'RESENT UPDATED: ' : 'SENT: ') + subjectPrefix + ' - ' + runDate);
+}
+
+function nhlFingerprint_(data) {
+  var digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    JSON.stringify(data),
+    Utilities.Charset.UTF_8
+  );
+  return Utilities.base64EncodeWebSafe(digest);
 }
 
 function buildNhlEmailHtml_(title, runDate, data) {
@@ -181,7 +193,7 @@ function escapeNhl_(value) {
 
 function runNhlMorningEmailChecks() {
   var hour = Number(Utilities.formatDate(new Date(), NHL_TZ, 'H'));
-  if (hour >= 6 && hour < 12) sendDailyNhlEmailsIfFresh();
+  if (hour >= 5 && hour < 16) sendDailyNhlEmailsIfFresh();
 }
 
 function installNhlEmailTrigger() {
@@ -190,9 +202,9 @@ function installNhlEmailTrigger() {
         t.getHandlerFunction() === 'runNhlMorningEmailChecks') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('sendDailyNhlEmailsIfFresh').timeBased()
-    .atHour(6).nearMinute(0).everyDays(1).inTimezone(NHL_TZ).create();
+    .atHour(5).nearMinute(45).everyDays(1).inTimezone(NHL_TZ).create();
   ScriptApp.newTrigger('runNhlMorningEmailChecks').timeBased().everyMinutes(5).create();
-  console.log('Installed daily 6 AM America/Los_Angeles send and 5-minute morning recovery checks.');
+  console.log('Installed daily ~5:45 AM America/Los_Angeles send and 5-minute recovery checks from 5 AM through 4 PM.');
 }
 
 
