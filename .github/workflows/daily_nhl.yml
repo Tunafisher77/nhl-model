@@ -1,6 +1,10 @@
 name: Daily NHL Picks
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/daily_nhl.yml'
   workflow_dispatch:
     inputs:
       target_date:
@@ -13,10 +17,14 @@ on:
         default: false
         type: boolean
   schedule:
-    # Prepare data before the 6 AM Pacific mailer in daylight and standard time.
-    - cron: '10,40 12 * * *'
-    - cron: '0,35 13 * * *'
-    - cron: '0,35 14 * * *'
+    # Generate well before the 6 AM Pacific mailer. Multiple early backups absorb
+    # GitHub schedule delays; the Apps Script sent markers prevent duplicate mail.
+    - cron: '30 9 * * *'
+    - cron: '30 10 * * *'
+    - cron: '30 11 * * *'
+    - cron: '15 12 * * *'
+    - cron: '15 13 * * *'
+    - cron: '15 14 * * *'
 
 permissions:
   contents: read
@@ -49,7 +57,20 @@ jobs:
           NHL_TARGET_DATE: ${{ github.event.inputs.target_date }}
           NHL_DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
           NHL_ALLOW_PRESTART: ${{ vars.NHL_ALLOW_PRESTART }}
-        run: python run_daily_nhl.py
+        shell: bash
+        run: |
+          set -uo pipefail
+          for attempt in 1 2 3; do
+            echo "NHL generation attempt ${attempt}/3"
+            if python run_daily_nhl.py; then
+              exit 0
+            fi
+            if [ "${attempt}" -lt 3 ]; then
+              sleep $((attempt * 30))
+            fi
+          done
+          echo "::error::NHL generation failed after 3 attempts."
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
