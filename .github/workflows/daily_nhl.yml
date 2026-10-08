@@ -20,15 +20,8 @@ on:
     # Generate well before the 6 AM Pacific mailer. Multiple early backups absorb
     # GitHub schedule delays; the Apps Script sent markers prevent duplicate mail.
     - cron: '30 9 * * *'
-    - cron: '30 10 * * *'
-    - cron: '30 11 * * *'
-    - cron: '15 12 * * *'
+    # One early generation plus one morning recovery; avoid hourly republishing.
     - cron: '15 13 * * *'
-    - cron: '15 14 * * *'
-    # Late recovery backups when GitHub delays the early scheduled runs.
-    - cron: '15 15 * * *'
-    - cron: '15 16 * * *'
-    - cron: '15 17 * * *'
 
 permissions:
   contents: read
