@@ -54,16 +54,20 @@ function sendNhlTableIfFresh_(tabName, subjectPrefix, markerPrefix) {
   }
   var props = PropertiesService.getScriptProperties();
   var marker = markerPrefix + '_sent_' + runDate;
-  var fingerprint = nhlFingerprint_(data);
-  var previousFingerprint = props.getProperty(marker);
-  if (previousFingerprint === fingerprint) return;
+  // Send once per slate date. Routine GitHub republishes must not
+  // generate [UPDATED] emails every time a sheet cell changes.
+  // Separate corrected-results mail remains available when explicitly run.
+  if (props.getProperty(marker)) {
+    console.log('ALREADY SENT: ' + subjectPrefix + ' - ' + runDate);
+    return;
+  }
   var recipient = props.getProperty('NHL_EMAIL_TO') || Session.getEffectiveUser().getEmail();
   if (!recipient) throw new Error('Set Script Property NHL_EMAIL_TO to the delivery email address.');
   var html = buildNhlEmailHtml_(subjectPrefix, runDate, data);
-  var subject = (previousFingerprint ? '[UPDATED] ' : '') + subjectPrefix + ' - ' + runDate;
+  var subject = subjectPrefix + ' - ' + runDate;
   GmailApp.sendEmail(recipient, subject, 'Open this email in HTML view.', {htmlBody: html});
-  props.setProperty(marker, fingerprint);
-  console.log((previousFingerprint ? 'RESENT UPDATED: ' : 'SENT: ') + subjectPrefix + ' - ' + runDate);
+  props.setProperty(marker, 'sent');
+  console.log('SENT: ' + subjectPrefix + ' - ' + runDate);
 }
 
 function nhlFingerprint_(data) {
