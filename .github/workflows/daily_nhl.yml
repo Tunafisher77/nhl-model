@@ -25,6 +25,10 @@ on:
     - cron: '15 12 * * *'
     - cron: '15 13 * * *'
     - cron: '15 14 * * *'
+    # Late recovery backups when GitHub delays the early scheduled runs.
+    - cron: '15 15 * * *'
+    - cron: '15 16 * * *'
+    - cron: '15 17 * * *'
 
 permissions:
   contents: read
