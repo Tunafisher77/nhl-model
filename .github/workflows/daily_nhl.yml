@@ -17,11 +17,10 @@ on:
         default: false
         type: boolean
   schedule:
-    # Generate well before the 6 AM Pacific mailer. Multiple early backups absorb
-    # GitHub schedule delays; the Apps Script sent markers prevent duplicate mail.
+    # Publish once per day. Re-publishing the same sheet can retrigger
+    # Apps Script update mailers, generating repeated [UPDATED] emails.
+    # Manual workflow_dispatch remains available for genuine recovery.
     - cron: '30 9 * * *'
-    # One early generation plus one morning recovery; avoid hourly republishing.
-    - cron: '15 13 * * *'
 
 permissions:
   contents: read
