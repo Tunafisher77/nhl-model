@@ -75,6 +75,38 @@ jobs:
           done
           echo "::error::NHL generation failed after 3 attempts."
           exit 1
+      - name: Verify published NHL email summaries
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          NHL_SPREADSHEET_ID: ${{ secrets.NHL_SPREADSHEET_ID }}
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          import google.auth
+          import gspread
+
+          expected = os.environ.get("NHL_TARGET_DATE") or datetime.now(
+              ZoneInfo("America/Los_Angeles")
+          ).date().isoformat()
+          credentials, _ = google.auth.default(
+              scopes=["https://www.googleapis.com/auth/spreadsheets"]
+          )
+          book = gspread.authorize(credentials).open_by_key(os.environ["NHL_SPREADSHEET_ID"])
+          tabs = (
+              "NHL Game Email Summary",
+              "NHL Goal Scorer Email Summary",
+              "NHL Best Card Email Summary",
+          )
+          for tab in tabs:
+              values = book.worksheet(tab).get("A1:A2")
+              actual = values[1][0].strip() if len(values) > 1 and values[1] else ""
+              print(f"{tab}: published={actual}, expected={expected}")
+              if actual != expected:
+                  raise SystemExit(f"::error::{tab} not ready for email delivery")
+          print("All three NHL email summaries are ready for the mailer.")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
