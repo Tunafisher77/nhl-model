@@ -79,6 +79,7 @@ jobs:
         if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
           NHL_SPREADSHEET_ID: ${{ secrets.NHL_SPREADSHEET_ID }}
+          NHL_TARGET_DATE: ${{ github.event.inputs.target_date }}
         run: |
           python - <<'PY'
           import os
