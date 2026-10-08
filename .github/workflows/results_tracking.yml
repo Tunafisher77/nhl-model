@@ -2,11 +2,9 @@ name: NHL Results Tracking
 
 on:
   schedule:
+    # Grade once before the morning mailer; avoid repeated sheet rewrites
+    # that can retrigger Apps Script [UPDATED] messages.
     - cron: '30 12 * * *'
-    - cron: '30 13 * * *'
-    # Recovery grading after the morning API traffic has cooled down.
-    - cron: '30 15 * * *'
-    - cron: '30 16 * * *'
   workflow_dispatch:
 
 permissions:
