@@ -35,9 +35,6 @@ def replace_rows(title: str, headers: list[str], rows: list[list[Any]]) -> None:
     sheet.clear()
     values = [headers] + rows
     sheet.update(values=values, range_name=f"A1:{gspread.utils.rowcol_to_a1(len(values), len(headers))}")
-    sheet.freeze(rows=1)
-    sheet.format("1:1", {"textFormat": {"bold": True}, "backgroundColor": {"red": .1, "green": .25, "blue": .45},
-                              "horizontalAlignment": "CENTER"})
 
 
 def append_unique_rows(title: str, headers: list[str], rows: list[list[Any]], key_columns: int) -> None:
@@ -56,7 +53,6 @@ def append_unique_rows(title: str, headers: list[str], rows: list[list[Any]], ke
     new_rows = [row for row in rows if tuple(str(v) for v in row[:key_columns]) not in keys]
     if new_rows:
         sheet.append_rows(new_rows, value_input_option="USER_ENTERED")
-    sheet.freeze(rows=1)
 
 
 def publish_game_email(day: date, rows: list[dict[str, Any]]) -> None:
