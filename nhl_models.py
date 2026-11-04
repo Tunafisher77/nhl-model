@@ -40,7 +40,7 @@ def build_player_pool(
         rows: list[dict[str, Any]] = []
         for player in fetch_roster(team):
             metrics = blend_player(current.get(player["player_id"]), prior.get(player["player_id"]))
-            if metrics["sample_gp"] < 3:
+            if metrics["gp"] < 1 or metrics["sample_gp"] < 3:
                 continue
             goal_score = 100 * (0.72 * metrics["goal_rate"] + 0.18 * metrics["shot_rate"] / 3 + 0.10 * metrics["points_rate"] / 1.2)
             assist_score = 100 * (0.72 * metrics["assist_rate"] + 0.28 * metrics["points_rate"] / 1.2)
