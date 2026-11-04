@@ -27,3 +27,21 @@ def test_nhl_roster_name_shape_is_documented():
         row.get("lastName", {}).get("default", "").strip(),
     ) if part)
     assert name == "Connor McDavid"
+
+
+def test_recent_game_verification_excludes_rostered_nonparticipants(monkeypatch):
+    import nhl_common
+    def fake_get(url):
+        if "club-schedule-season" in url:
+            return {"games": [{"id": 101, "gameDate": "2026-11-03", "gameType": 2, "gameState": "OFF"}]}
+        return {"playerByGameStats": {"homeTeam": {"forwards": [{"playerId": 2}]}, "awayTeam": {}}}
+    monkeypatch.setattr(nhl_common, "get_json", fake_get)
+    monkeypatch.setattr(nhl_common, "fetch_roster", lambda team: [
+        {"player_id": 1}, {"player_id": 2}])
+    assert nhl_common.fetch_recent_active_skater_ids("LAK", date(2026, 11, 4)) == {2}
+
+
+def test_recent_game_verification_fails_closed_without_completed_game(monkeypatch):
+    import nhl_common
+    monkeypatch.setattr(nhl_common, "get_json", lambda url: {"games": []})
+    assert nhl_common.fetch_recent_active_skater_ids("LAK", date(2026, 11, 4)) == set()
