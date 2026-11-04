@@ -227,3 +227,28 @@ def chunked(values: Iterable[Any], size: int) -> Iterable[list[Any]]:
             batch = []
     if batch:
         yield batch
+
+
+def fetch_recent_active_skater_ids(team: str, day: date) -> set[int]:
+    """Conservative pregame eligibility: skaters dressed in team's last completed game.
+
+    This is not a confirmed lineup for today's game. Missing or unavailable data
+    returns an empty set so callers can fail closed rather than select injured players.
+    """
+    payload = get_json(f"{WEB_API}/club-schedule-season/{team}/{season_id(day)}")
+    prior_games = [g for g in payload.get("games", [])
+                   if g.get("gameDate", "") < day.isoformat()
+                   and int(g.get("gameType", 0)) == 2
+                   and g.get("gameState") in ("OFF", "FINAL")]
+    if not prior_games:
+        return set()
+    latest = max(prior_games, key=lambda g: (g["gameDate"], int(g["id"])))
+    box = get_json(f"{WEB_API}/gamecenter/{latest['id']}/boxscore")
+    ids = set()
+    for side in ("awayTeam", "homeTeam"):
+        for group in ("forwards", "defense", "defensemen"):
+            for player in (box.get("playerByGameStats", {}).get(side, {}).get(group, []) or []):
+                if player.get("playerId"):
+                    ids.add(int(player["playerId"]))
+    roster_ids = {p["player_id"] for p in fetch_roster(team)}
+    return ids & roster_ids
