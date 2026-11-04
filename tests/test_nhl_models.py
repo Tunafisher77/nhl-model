@@ -54,3 +54,16 @@ def test_best_card_is_seven_picks_per_game_and_max_three_cards():
         assert 1 + len(card["goal_scorers"]) + len(card["assists"]) + len(card["shots"]) == 7
         assert {p["team"] for p in card["goal_scorers"]} == set(card["matchup"].split(" at "))
 
+
+
+def test_zero_current_season_games_are_excluded(monkeypatch):
+    from nhl_models import build_player_pool
+    monkeypatch.setattr("nhl_models.fetch_roster", lambda team: [
+        {"player_id": 1, "name": "Inactive Veteran", "position": "L"},
+        {"player_id": 2, "name": "Active Skater", "position": "C"},
+    ])
+    prior = {1: {"gamesPlayed": 70, "goals": 30, "points": 60},
+             2: {"gamesPlayed": 70, "goals": 20, "points": 50}}
+    current = {2: {"gamesPlayed": 5, "goals": 2, "points": 4}}
+    pool = build_player_pool({"LAK"}, current, prior)
+    assert [p["player_id"] for p in pool["LAK"]] == [2]
