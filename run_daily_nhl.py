@@ -6,7 +6,7 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
-from nhl_common import PACIFIC, START_DATE, fetch_games, fetch_skater_stats, fetch_standings, previous_season_id, season_id, target_date, fetch_game_active_player_ids, fetch_roster
+from nhl_common import PACIFIC, START_DATE, fetch_games, fetch_skater_stats, fetch_standings, previous_season_id, season_id, target_date, fetch_game_active_player_ids, fetch_recent_active_skater_ids
 from nhl_models import best_cards, build_player_pool, evaluate_games, goal_scorer_email
 from nhl_publish import publish_best_cards, publish_game_email, publish_goal_email
 
@@ -24,28 +24,28 @@ def run() -> dict:
     current = fetch_skater_stats(season_id(day))
     prior = fetch_skater_stats(previous_season_id(day))
     pool = build_player_pool({g.away for g in games} | {g.home for g in games}, current, prior)
-    # Protect all player-pick emails from known scratches/injuries. When the NHL
-    # gamecenter feed exposes the active game roster, only those skaters remain
-    # eligible. If it is not available yet, keep the statistical pool rather than
-    # guessing an inactive status; the morning recovery run can refresh it later.
-    active_by_team: dict[str, set[int]] = {}
-    for team in ({g.away for g in games} | {g.home for g in games}):
-        try:
-            roster_ids = {p["player_id"] for p in fetch_roster(team)}
-            if roster_ids:
-                active_by_team[team] = roster_ids
-        except Exception as exc:
-            print(f"Warning: current-roster fallback unavailable for {team}: {exc}")
+    # Today's official dressed list takes precedence. Before it is published,
+    # require participation in the team's most recent completed game. Never
+    # fall back to season roster membership or prior-season statistics.
+    verified_teams = set()
     for game in games:
-        active = fetch_game_active_player_ids(game.game_id)
-        if active:
-            for team in (game.away, game.home):
-                team_roster_ids = {p["player_id"] for p in pool.get(team, [])}
-                confirmed = active & team_roster_ids
-                if confirmed:
-                    active_by_team[team] = confirmed
-    for team, active_ids in active_by_team.items():
-        pool[team] = [p for p in pool.get(team, []) if p["player_id"] in active_ids]
+        dressed_today = fetch_game_active_player_ids(game.game_id)
+        for team in (game.away, game.home):
+            candidates = {p["player_id"] for p in pool.get(team, [])}
+            confirmed = dressed_today & candidates
+            if not confirmed:
+                try:
+                    confirmed = fetch_recent_active_skater_ids(team, day) & candidates
+                except Exception as exc:
+                    print(f"Warning: recent-game verification failed for {team}: {exc}")
+            if confirmed:
+                pool[team] = [p for p in pool[team] if p["player_id"] in confirmed]
+                verified_teams.add(team)
+            else:
+                pool[team] = []
+                print(f"Warning: no verified skaters for {team}; excluding team from player picks")
+    if not verified_teams:
+        raise RuntimeError("Fail closed: no verified NHL player eligibility data")
     game_rows = evaluate_games(games, standings)
     goal_rows = goal_scorer_email(games, pool, day)
     cards = best_cards(games, game_rows, pool, day)
