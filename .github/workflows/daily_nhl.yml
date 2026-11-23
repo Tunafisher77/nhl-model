@@ -107,3 +107,5 @@ jobs:
           path: nhl_output.json
           if-no-files-found: ignore
           retention-days: 14
+
+# Recovery dispatch: 2026-11-23 missing scheduled delivery; no logic changes.
